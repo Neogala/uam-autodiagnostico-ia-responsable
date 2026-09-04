@@ -1,0 +1,5 @@
+{
+  "name": "UAM Autodiagnóstico de IA Responsable",
+  "description": "Herramienta interactiva de autodiagnóstico ético y técnico para proyectos de IA en la Universidad Autónoma Metropolitana (UAM), basada en el Decálogo de Ética UAM, UNESCO y OCDE.",
+  "requestFramePermissions": []
+}
