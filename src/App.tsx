@@ -10,7 +10,8 @@ import {
   EvaluationReportState,
   UAM_DECALOGO_PRINCIPLES,
   calculatePrincipleResult,
-  PrincipleScoreResult
+  PrincipleScoreResult,
+  buildEmptyPerfilProyecto
 } from './types';
 import { Header } from './components/Header';
 import { ProjectMetadataBar } from './components/ProjectMetadataBar';
@@ -50,7 +51,26 @@ function buildEmptyState(unit: UAMUnit = 'Azcapotzalco'): EvaluationReportState 
       6: null, 7: null, 8: null, 9: null, 10: null
     },
     completedSafeguards: {},
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    perfilProyecto: buildEmptyPerfilProyecto(),
+    autovaloraciones: {},
+    respuestasCualitativas: {},
+    notasPorPrincipio: {},
+    progresoPorPrincipio: {}
+  };
+}
+
+// Merges defaults for fields added after a project may have been saved, so
+// registros guardados con el modelo anterior no rompen la app al abrirlos.
+function normalizeState(state: EvaluationReportState): EvaluationReportState {
+  return {
+    ...buildEmptyState(state.unit),
+    ...state,
+    perfilProyecto: { ...buildEmptyPerfilProyecto(), ...(state.perfilProyecto || {}) },
+    autovaloraciones: state.autovaloraciones || {},
+    respuestasCualitativas: state.respuestasCualitativas || {},
+    notasPorPrincipio: state.notasPorPrincipio || {},
+    progresoPorPrincipio: state.progresoPorPrincipio || {}
   };
 }
 
@@ -61,7 +81,7 @@ function initializeSession(): { id: string; state: EvaluationReportState } {
   if (existingId) {
     const loaded = loadProject(existingId);
     if (loaded) {
-      return { id: existingId, state: loaded };
+      return { id: existingId, state: normalizeState(loaded) };
     }
   }
   return { id: generateProjectId(), state: buildEmptyState() };
@@ -115,6 +135,20 @@ export default function App() {
     return sum / answered.length;
   }, [results]);
 
+  // Effective per-principle progress: explicit "completado_validado" override wins;
+  // otherwise derive from whether the principle has been scored yet.
+  const progresoEfectivo = useMemo(() => {
+    const map: Record<number, EvaluationReportState['progresoPorPrincipio'][number]> = {};
+    UAM_DECALOGO_PRINCIPLES.forEach(p => {
+      if (state.progresoPorPrincipio[p.id] === 'completado_validado') {
+        map[p.id] = 'completado_validado';
+      } else {
+        map[p.id] = state.scores[p.id] != null ? 'parcial' : 'sin_responder';
+      }
+    });
+    return map;
+  }, [state.progresoPorPrincipio, state.scores]);
+
   const completedSteps: StepId[] = useMemo(() => {
     const done: StepId[] = [];
     if (state.projectTitle.trim() !== '') done.push('datos');
@@ -151,6 +185,38 @@ export default function App() {
     }));
   };
 
+  const handleChangePerfil = (updates: Partial<EvaluationReportState['perfilProyecto']>) => {
+    setState(prev => ({ ...prev, perfilProyecto: { ...prev.perfilProyecto, ...updates } }));
+  };
+
+  const handleSetAutovaloracion = (principleId: number, nivel: EvaluationReportState['autovaloraciones'][number]) => {
+    setState(prev => ({ ...prev, autovaloraciones: { ...prev.autovaloraciones, [principleId]: nivel } }));
+  };
+
+  const handleSetRespuestaCualitativa = (preguntaId: string, valor: string, justificacion?: string) => {
+    setState(prev => ({
+      ...prev,
+      respuestasCualitativas: { ...prev.respuestasCualitativas, [preguntaId]: { valor, justificacion } }
+    }));
+  };
+
+  const handleSetNota = (principleId: number, texto: string) => {
+    setState(prev => ({ ...prev, notasPorPrincipio: { ...prev.notasPorPrincipio, [principleId]: texto } }));
+  };
+
+  const handleToggleValidado = (principleId: number) => {
+    setState(prev => {
+      const current = prev.progresoPorPrincipio[principleId];
+      const next = { ...prev.progresoPorPrincipio };
+      if (current === 'completado_validado') {
+        delete next[principleId];
+      } else {
+        next[principleId] = 'completado_validado';
+      }
+      return { ...prev, progresoPorPrincipio: next };
+    });
+  };
+
   const startNewProject = () => {
     const newId = generateProjectId();
     const newState = buildEmptyState(state.unit);
@@ -175,7 +241,7 @@ export default function App() {
     if (!loaded) return;
     setCurrentProjectId(id);
     setCurrentProjectIdState(id);
-    setState(loaded);
+    setState(normalizeState(loaded));
     setCurrentStep('datos');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -200,7 +266,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100/70 text-slate-800 font-sans flex flex-col antialiased">
+    <div className="min-h-screen bg-surface-2 text-ink-900 font-sans flex flex-col antialiased">
 
       {/* Top Navbar */}
       <Header
@@ -220,19 +286,19 @@ export default function App() {
         <StepNav currentStep={currentStep} onStepChange={setCurrentStep} completedSteps={completedSteps} />
 
         {/* Floating Quick Action Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 text-white p-3 rounded-xl shadow-sm mb-8 border border-slate-800">
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-ink-900 text-white p-3 rounded-xl shadow-sm mb-8 border border-ink-700">
           <div className="flex items-center gap-2 text-xs font-semibold">
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+            <span className="w-2 h-2 rounded-full bg-brand animate-pulse"></span>
             <span>Autodiagnóstico Institucional UAM</span>
-            <span className="text-slate-400 hidden sm:inline">•</span>
-            <span className="text-amber-300 hidden sm:inline">10 Principios del Decálogo</span>
+            <span className="text-ink-500 hidden sm:inline">•</span>
+            <span className="text-white/70 hidden sm:inline">10 Principios del Decálogo</span>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               id="btn-quick-new-project"
               onClick={handleNewProject}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-white rounded-lg transition border border-slate-700 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-white/10 hover:bg-white/20 text-white rounded-lg transition border border-white/10 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               title="Iniciar nuevo proyecto"
             >
               <span>+ Nuevo Registro</span>
@@ -241,7 +307,7 @@ export default function App() {
             <button
               id="btn-open-export-modal"
               onClick={() => setIsExportOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg transition shadow-xs cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-brand hover:bg-brand-hover text-white rounded-lg transition shadow-xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-ink-900"
             >
               <span>Generar Dictamen y Entregables</span>
             </button>
@@ -249,7 +315,7 @@ export default function App() {
             <button
               id="btn-quick-print"
               onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition border border-slate-700 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white/10 hover:bg-white/20 text-white rounded-lg transition border border-white/10 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               <span>Imprimir / PDF</span>
             </button>
@@ -262,6 +328,7 @@ export default function App() {
             <ProjectMetadataBar
               state={state}
               onChangeState={(updates) => setState(prev => ({ ...prev, ...updates }))}
+              onChangePerfil={handleChangePerfil}
               onNewProject={handleNewProject}
               onResetScores={handleResetScores}
             />
@@ -282,14 +349,21 @@ export default function App() {
             scores={state.scores}
             onScoreChange={handleScoreChange}
             onSetAllScores={handleSetAllScores}
+            perfilProyecto={state.perfilProyecto}
+            autovaloraciones={state.autovaloraciones}
+            onSetAutovaloracion={handleSetAutovaloracion}
+            respuestasCualitativas={state.respuestasCualitativas}
+            onSetRespuestaCualitativa={handleSetRespuestaCualitativa}
+            progresoEfectivo={progresoEfectivo}
+            onToggleValidado={handleToggleValidado}
           />
         )}
 
         {/* Step 3: Resultados */}
         {currentStep === 'resultados' && (
           <>
-            <ResultsTableSection results={results} globalScore={globalScore} />
-            <RadarChartSection results={results} />
+            <ResultsTableSection results={results} globalScore={globalScore} autovaloraciones={state.autovaloraciones} />
+            <RadarChartSection results={results} respuestasCualitativas={state.respuestasCualitativas} />
           </>
         )}
 
@@ -300,6 +374,8 @@ export default function App() {
             completedSafeguards={state.completedSafeguards}
             onToggleSafeguard={handleToggleSafeguard}
             onPrintReport={handlePrint}
+            notasPorPrincipio={state.notasPorPrincipio}
+            onSetNota={handleSetNota}
           />
         )}
 

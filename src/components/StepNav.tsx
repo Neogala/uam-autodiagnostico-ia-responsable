@@ -24,7 +24,7 @@ interface StepNavProps {
 
 export const StepNav: React.FC<StepNavProps> = ({ currentStep, onStepChange, completedSteps }) => {
   return (
-    <nav aria-label="Progreso de la autoevaluación" className="bg-white border border-slate-200 rounded-xl shadow-xs mb-6 p-2 sm:p-3">
+    <nav aria-label="Progreso de la autoevaluación" className="bg-white border border-line rounded-xl shadow-xs mb-6 p-2 sm:p-3">
       <ol className="flex flex-col sm:flex-row gap-1.5 sm:gap-2">
         {STEPS.map((step, index) => {
           const isActive = step.id === currentStep;
@@ -36,19 +36,19 @@ export const StepNav: React.FC<StepNavProps> = ({ currentStep, onStepChange, com
                 type="button"
                 onClick={() => onStepChange(step.id)}
                 aria-current={isActive ? 'step' : undefined}
-                className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-1 ${
+                className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 ${
                   isActive
-                    ? 'bg-slate-900 text-white shadow-sm'
-                    : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                    ? 'bg-ink-900 text-white shadow-sm'
+                    : 'bg-surface-2 text-ink-700 hover:bg-line'
                 }`}
               >
                 <span
                   className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold shrink-0 ${
                     isActive
-                      ? 'bg-amber-400 text-slate-950'
+                      ? 'bg-brand text-white'
                       : isDone
-                      ? 'bg-emerald-500 text-white'
-                      : 'bg-slate-300 text-slate-700'
+                      ? 'bg-sem-optimo text-white'
+                      : 'bg-ink-500/30 text-ink-700'
                   }`}
                 >
                   {isDone ? <Check className="w-3.5 h-3.5" /> : index + 1}

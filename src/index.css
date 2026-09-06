@@ -1,1 +1,33 @@
 @import "tailwindcss";
+
+@theme {
+  /* Marca UAM-Azcapotzalco (acento de identidad, CTA primario) */
+  --color-brand: #CD032E;
+  --color-brand-hover: #B00028;
+  --color-brand-ink: #A80026;
+  --color-brand-tint: #FCE9EC;
+
+  /* Base institucional (negro) + neutrales */
+  --color-ink-900: #16181D;
+  --color-ink-700: #3A414A;
+  --color-ink-500: #6B7480;
+  --color-line: #E4E8EC;
+  --color-surface: #FFFFFF;
+  --color-surface-2: #F6F8FA;
+
+  /* Semáforo funcional — deliberadamente distinto del rojo de marca */
+  --color-sem-critico: #B00710;
+  --color-sem-critico-bg: #FDECEC;
+  --color-sem-moderado: #B26A00;
+  --color-sem-moderado-bg: #FFF3E0;
+  --color-sem-optimo: #1E7D34;
+  --color-sem-optimo-bg: #E7F5EB;
+
+  --color-focus: #1558D6;
+
+  --font-sans: 'Inter', system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, "Segoe UI", sans-serif;
+}

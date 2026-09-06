@@ -16,6 +16,69 @@ export type UserRole =
 export type RiskLevel = 'Sin evaluar' | 'Rojo / Riesgo Crítico' | 'Amarillo / Riesgo Moderado' | 'Verde / Cumplimiento Óptimo';
 export type RiskClass = 'unscored' | 'critical' | 'moderate' | 'optimal';
 
+// ---------------------------------------------------------------------------
+// Ampliación metodológica (patrones ALTAI) — ver plan "Identidad visual
+// UAM-Azcapotzalco + rediseño metodológico ALTAI". Todo lo de aquí abajo es
+// ADITIVO: no se toca ninguno de los campos de DecalogoPrinciple/EvaluationReportState
+// que ya usan tabla/radar/dictamen/export. `intro`/`subdimensiones`/`marcos` son
+// opcionales a propósito: los principios sin contenido piloto simplemente no
+// muestran esas secciones (degradan con gracia).
+// ---------------------------------------------------------------------------
+
+export type TipoRespuesta = 'binaria' | 'opcion_multiple' | 'texto';
+export type Marco = 'Decalogo UAM' | 'UNESCO 2021' | 'OCDE' | 'LGPDPPSO';
+export type NivelMadurez = 'no_existente' | 'bajo' | 'moderado' | 'significativo' | 'alto';
+export type SupervisionHumana = 'in-the-loop' | 'on-the-loop' | 'in-command' | 'no_aplica';
+
+export const NIVEL_MADUREZ_LABEL: Record<NivelMadurez, string> = {
+  no_existente: 'No existente',
+  bajo: 'Bajo',
+  moderado: 'Moderado',
+  significativo: 'Significativo',
+  alto: 'Alto'
+};
+
+export interface PerfilProyecto {
+  tipoSistema: string[];
+  autonomo: boolean;
+  autoaprendizaje: boolean;
+  decideSobrePersonas: boolean;
+  supervision: SupervisionHumana;
+  abortoSeguro: boolean;
+}
+
+export function buildEmptyPerfilProyecto(): PerfilProyecto {
+  return {
+    tipoSistema: [],
+    autonomo: false,
+    autoaprendizaje: false,
+    decideSobrePersonas: false,
+    supervision: 'no_aplica',
+    abortoSeguro: false
+  };
+}
+
+export interface PreguntaCualitativa {
+  id: string;
+  enunciado: string;
+  tipo: TipoRespuesta;
+  /** Requerido para tipo 'opcion_multiple' o 'binaria' (p.ej. ['Sí','No','En cierto grado','No sé']). */
+  opciones?: string[];
+  permiteJustificacion?: boolean;
+  marcos: Marco[];
+  /** Distingue si la pregunta se refiere a quien opera el sistema o a quien recibe sus efectos. */
+  distincionSujeto?: 'usuario' | 'sujeto_afectado';
+  /** Si se define, la pregunta solo se muestra cuando el perfil del proyecto cumple esta condición. */
+  aplicaSiPerfil?: (perfil: PerfilProyecto) => boolean;
+}
+
+export interface Subdimension {
+  id: string;
+  nombre: string;
+  preguntas: PreguntaCualitativa[];
+  banco: Record<'critical' | 'moderate' | 'optimal', { diagnostico: string; recomendacion: string; fuente: string }>;
+}
+
 export interface DecalogoPrinciple {
   id: number;
   /** Nombre canónico: usado en cuestionario, tabla de resultados y dictamen. */
@@ -48,6 +111,14 @@ export interface DecalogoPrinciple {
       normative: string;
     };
   };
+  /**
+   * Contenido metodológico ALTAI opcional. Solo 2 principios piloto lo tienen
+   * mientras se valida el patrón — borrador pedagógico, no es texto oficial
+   * del Decálogo UAM. Ver comentario junto a UAM_DECALOGO_PRINCIPLES.
+   */
+  intro?: { definiciones: string[]; ejemplosUAM: string[] };
+  subdimensiones?: Subdimension[];
+  marcos?: Marco[];
 }
 
 export const UAM_DECALOGO_PRINCIPLES: DecalogoPrinciple[] = [
@@ -82,7 +153,100 @@ export const UAM_DECALOGO_PRINCIPLES: DecalogoPrinciple[] = [
         technical: 'Mantener bitácoras periódicas de las decisiones humanas ratificadas o rectificadas para mejora continua del modelo.',
         normative: 'Documentar el flujo como buena práctica transferible a otras áreas y divisiones de la UAM.'
       }
-    }
+    },
+    // --- Piloto ALTAI (borrador pedagógico, pendiente de validación UAM) ---
+    intro: {
+      definiciones: [
+        'Supervisión humana ("human-in-the-loop"): mecanismo por el cual una persona debe validar, o puede anular, una decisión del sistema antes de que surta efecto sobre alguien.',
+        'Persona afectada (o "sujeto afectado"): quien recibe las consecuencias de una decisión asistida por IA, sin ser necesariamente quien la opera.'
+      ],
+      ejemplosUAM: [
+        'Un sistema que sugiere una calificación o retroalimentación automática debe permitir que la persona docente la revise y modifique antes de publicarla.',
+        'Un algoritmo que preselecciona solicitudes de beca debe permitir que el área administrativa revise manualmente los casos marcados como rechazados antes de notificar a la persona solicitante.'
+      ]
+    },
+    marcos: ['Decalogo UAM', 'UNESCO 2021'],
+    subdimensiones: [
+      {
+        id: 'p1-sd1',
+        nombre: 'Supervisión humana efectiva',
+        preguntas: [
+          {
+            id: 'p1-sd1-q1',
+            enunciado: '¿Existe una persona identificada con autoridad para revisar o revertir una decisión del sistema antes de que tenga efectos sobre alguien?',
+            tipo: 'binaria',
+            opciones: ['Sí', 'No', 'En cierto grado', 'No sé'],
+            permiteJustificacion: true,
+            marcos: ['Decalogo UAM', 'UNESCO 2021'],
+            distincionSujeto: 'usuario'
+          },
+          {
+            id: 'p1-sd1-q2',
+            enunciado: '¿Las personas afectadas por una decisión del sistema saben que pueden solicitar su revisión?',
+            tipo: 'binaria',
+            opciones: ['Sí', 'No', 'En cierto grado', 'No sé'],
+            permiteJustificacion: true,
+            marcos: ['Decalogo UAM'],
+            distincionSujeto: 'sujeto_afectado'
+          }
+        ],
+        banco: {
+          critical: {
+            diagnostico: 'No hay una persona claramente responsable de revisar o revertir decisiones del sistema, ni las personas afectadas saben que pueden pedir revisión.',
+            recomendacion: 'Nombrar formalmente a la persona o instancia responsable de la supervisión humana y comunicarlo a quienes usan o reciben efectos del sistema.',
+            fuente: 'Decálogo de Ética UAM (Principio 1); UNESCO (2021), Recomendación sobre la Ética de la IA.'
+          },
+          moderate: {
+            diagnostico: 'La supervisión humana existe pero es informal o poco conocida por las personas afectadas.',
+            recomendacion: 'Formalizar el rol de supervisión (quién revisa, cuándo, con qué criterio) y hacerlo visible en la interfaz o en la comunicación del proyecto.',
+            fuente: 'Decálogo de Ética UAM (Principio 1); UNESCO (2021), Recomendación sobre la Ética de la IA.'
+          },
+          optimal: {
+            diagnostico: 'La supervisión humana está formalizada, es conocida por las personas afectadas y es efectiva en la práctica.',
+            recomendacion: 'Documentar el mecanismo como referencia para otros proyectos de la unidad universitaria.',
+            fuente: 'Decálogo de Ética UAM (Principio 1); UNESCO (2021), Recomendación sobre la Ética de la IA.'
+          }
+        }
+      },
+      {
+        id: 'p1-sd2',
+        nombre: 'Mecanismo de impugnación',
+        preguntas: [
+          {
+            id: 'p1-sd2-q1',
+            enunciado: '¿Qué tan formalizado está el canal para impugnar una decisión asistida por el sistema?',
+            tipo: 'opcion_multiple',
+            opciones: ['No existe', 'Informal (correo o verbal)', 'Formal pero no documentado', 'Formal y documentado'],
+            marcos: ['Decalogo UAM', 'UNESCO 2021']
+          },
+          {
+            id: 'p1-sd2-q2',
+            enunciado: '¿Se registra y se da seguimiento a las solicitudes de revisión recibidas?',
+            tipo: 'binaria',
+            opciones: ['Sí', 'No', 'En cierto grado', 'No sé'],
+            permiteJustificacion: true,
+            marcos: ['Decalogo UAM']
+          }
+        ],
+        banco: {
+          critical: {
+            diagnostico: 'No existe un canal de impugnación ni registro de las solicitudes de revisión.',
+            recomendacion: 'Crear un canal mínimo (formulario o correo dedicado) y llevar un registro simple de cada solicitud recibida.',
+            fuente: 'Decálogo de Ética UAM (Principio 1); Reglamento de Estudios Superiores de la UAM (derecho de revisión académica).'
+          },
+          moderate: {
+            diagnostico: 'Existe un canal, pero es informal o el seguimiento de las solicitudes es inconsistente.',
+            recomendacion: 'Documentar el procedimiento (plazos, responsable, criterios de resolución) y darle seguimiento sistemático.',
+            fuente: 'Decálogo de Ética UAM (Principio 1); Reglamento de Estudios Superiores de la UAM (derecho de revisión académica).'
+          },
+          optimal: {
+            diagnostico: 'El canal de impugnación está formalizado, documentado y con seguimiento sistemático de cada caso.',
+            recomendacion: 'Revisar periódicamente los casos registrados para identificar patrones que ameriten ajustes al sistema.',
+            fuente: 'Decálogo de Ética UAM (Principio 1); Reglamento de Estudios Superiores de la UAM (derecho de revisión académica).'
+          }
+        }
+      }
+    ]
   },
   {
     id: 2,
@@ -346,7 +510,99 @@ export const UAM_DECALOGO_PRINCIPLES: DecalogoPrinciple[] = [
         technical: 'Mantener tableros analíticos de auditoría en tiempo real para supervisión del rendimiento.',
         normative: 'Cumplimiento ejemplar con la política de transparencia de la UAM.'
       }
-    }
+    },
+    // --- Piloto ALTAI (borrador pedagógico, pendiente de validación UAM) ---
+    intro: {
+      definiciones: [
+        'Trazabilidad: capacidad de reconstruir, después de los hechos, el origen y el proceso que produjo un resultado específico del sistema.',
+        'Rendición de cuentas: existencia de una persona o instancia institucional identificable, responsable de explicar y responder por el funcionamiento del sistema.'
+      ],
+      ejemplosUAM: [
+        'Un asistente que responde preguntas sobre trámites escolares debe poder mostrar de qué documento o normativa tomó la respuesta.',
+        'Si un sistema de detección de similitud (plagio) marca un trabajo como sospechoso, debe quedar registro de qué fuentes comparó y con qué criterio, para que la persona docente pueda explicarlo a la persona estudiante.'
+      ]
+    },
+    marcos: ['Decalogo UAM', 'LGPDPPSO'],
+    subdimensiones: [
+      {
+        id: 'p9-sd1',
+        nombre: 'Trazabilidad técnica',
+        preguntas: [
+          {
+            id: 'p9-sd1-q1',
+            enunciado: '¿El sistema registra automáticamente qué versión del modelo y qué fuentes se usaron para generar cada resultado?',
+            tipo: 'binaria',
+            opciones: ['Sí', 'No', 'En cierto grado', 'No sé'],
+            permiteJustificacion: true,
+            marcos: ['Decalogo UAM']
+          },
+          {
+            id: 'p9-sd1-q2',
+            enunciado: '¿Es posible reconstruir, después de los hechos, cómo se llegó a un resultado específico?',
+            tipo: 'binaria',
+            opciones: ['Sí', 'No', 'En cierto grado', 'No sé'],
+            permiteJustificacion: true,
+            marcos: ['Decalogo UAM']
+          }
+        ],
+        banco: {
+          critical: {
+            diagnostico: 'No hay registro de versiones, parámetros ni fuentes usadas por el sistema; los resultados no son reconstruibles.',
+            recomendacion: 'Implementar un esquema mínimo de bitácora (fecha, versión del modelo, fuentes/parámetros usados) para cada resultado relevante.',
+            fuente: 'Decálogo de Ética UAM (Principio 9); ISO/IEC 42001:2023 (trazabilidad).'
+          },
+          moderate: {
+            diagnostico: 'Existen registros básicos, pero incompletos o no siempre permiten reconstruir un resultado específico.',
+            recomendacion: 'Enriquecer las bitácoras con metadatos suficientes para explicar cualquier resultado individual a solicitud.',
+            fuente: 'Decálogo de Ética UAM (Principio 9); ISO/IEC 42001:2023 (trazabilidad).'
+          },
+          optimal: {
+            diagnostico: 'La trazabilidad técnica es completa: cualquier resultado puede reconstruirse y explicarse con precisión.',
+            recomendacion: 'Mantener y auditar periódicamente el esquema de bitácoras conforme evolucione el sistema.',
+            fuente: 'Decálogo de Ética UAM (Principio 9); ISO/IEC 42001:2023 (trazabilidad).'
+          }
+        }
+      },
+      {
+        id: 'p9-sd2',
+        nombre: 'Rendición de cuentas ante la comunidad',
+        preguntas: [
+          {
+            id: 'p9-sd2-q1',
+            enunciado: '¿Quién puede solicitar y obtener una explicación sobre un resultado del sistema?',
+            tipo: 'opcion_multiple',
+            opciones: ['Nadie / no está definido', 'Solo el área que lo administra', 'Cualquier persona usuaria que lo solicite', 'Cualquier persona usuaria o afectada, con procedimiento documentado'],
+            marcos: ['Decalogo UAM', 'LGPDPPSO'],
+            distincionSujeto: 'sujeto_afectado'
+          },
+          {
+            id: 'p9-sd2-q2',
+            enunciado: '¿Existe un responsable institucional identificado a quien rendirle cuentas sobre el funcionamiento del sistema?',
+            tipo: 'binaria',
+            opciones: ['Sí', 'No', 'En cierto grado', 'No sé'],
+            permiteJustificacion: true,
+            marcos: ['Decalogo UAM']
+          }
+        ],
+        banco: {
+          critical: {
+            diagnostico: 'No hay una vía definida para solicitar explicaciones ni un responsable institucional identificado.',
+            recomendacion: 'Designar formalmente a la persona o instancia responsable y publicar cómo solicitar una explicación sobre el sistema.',
+            fuente: 'Decálogo de Ética UAM (Principio 9); Reglamento de Transparencia de la UAM.'
+          },
+          moderate: {
+            diagnostico: 'Existe un responsable o una vía de solicitud, pero no ambos, o no están comunicados a toda la comunidad afectada.',
+            recomendacion: 'Documentar y difundir tanto al responsable institucional como el procedimiento para solicitar explicaciones.',
+            fuente: 'Decálogo de Ética UAM (Principio 9); Reglamento de Transparencia de la UAM.'
+          },
+          optimal: {
+            diagnostico: 'Hay un responsable institucional claro y un procedimiento documentado y conocido para solicitar explicaciones.',
+            recomendacion: 'Revisar periódicamente las solicitudes recibidas para identificar mejoras al sistema o a su comunicación.',
+            fuente: 'Decálogo de Ética UAM (Principio 9); Reglamento de Transparencia de la UAM.'
+          }
+        }
+      }
+    ]
   },
   {
     id: 10,
@@ -394,6 +650,13 @@ export interface PrincipleScoreResult {
   normativeRecommendation: string;
 }
 
+export type ProgresoPrincipio = 'sin_responder' | 'parcial' | 'completado_validado';
+
+export interface RespuestaCualitativa {
+  valor: string;
+  justificacion?: string;
+}
+
 export interface EvaluationReportState {
   projectTitle: string;
   unit: UAMUnit;
@@ -404,6 +667,28 @@ export interface EvaluationReportState {
   scores: Record<number, number | null>; // principleId -> 1..5, null = sin evaluar
   completedSafeguards: Record<number, boolean>; // principleId -> salvaguarda atendida
   timestamp: string;
+  // --- Ampliación ALTAI (aditivo, ver comentario arriba de PerfilProyecto) ---
+  perfilProyecto: PerfilProyecto;
+  autovaloraciones: Record<number, NivelMadurez | null>; // principleId -> autovaloración previa al cálculo
+  respuestasCualitativas: Record<string, RespuestaCualitativa>; // key = preguntaId
+  notasPorPrincipio: Record<number, string>;
+  progresoPorPrincipio: Record<number, ProgresoPrincipio>;
+}
+
+/**
+ * Trazabilidad a marcos normativos (punto 9, Bloque B): si el principio no
+ * define `marcos` explícitamente (solo los pilotos lo hacen), se infiere leyendo
+ * las fuentes técnica/normativa YA presentes en el dato — no se agrega ninguna
+ * atribución nueva, solo se hace explícito lo que el texto existente ya cita.
+ */
+export function getMarcosForPrinciple(principle: DecalogoPrinciple): Marco[] {
+  if (principle.marcos && principle.marcos.length > 0) return principle.marcos;
+  const text = `${principle.sources.technical} ${principle.sources.normative}`.toLowerCase();
+  const marcos: Marco[] = ['Decalogo UAM'];
+  if (text.includes('unesco')) marcos.push('UNESCO 2021');
+  if (text.includes('ocde') || text.includes('oecd')) marcos.push('OCDE');
+  if (text.includes('lgpdppso') || text.includes('protección de datos') || text.includes('datos personales')) marcos.push('LGPDPPSO');
+  return marcos;
 }
 
 export function calculatePrincipleResult(principle: DecalogoPrinciple, rawScore: number | null): PrincipleScoreResult {
@@ -479,9 +764,9 @@ export function generateStandaloneRadarHtml(
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      background: #0f172a;
-      color: #f8fafc;
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #16181D;
+      color: #F6F8FA;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -489,8 +774,8 @@ export function generateStandaloneRadarHtml(
       margin: 0;
     }
     .card {
-      background: #1e293b;
-      border: 1px solid #334155;
+      background: #1F2229;
+      border: 1px solid #3A414A;
       border-radius: 16px;
       padding: 24px;
       max-width: 800px;
@@ -500,11 +785,11 @@ export function generateStandaloneRadarHtml(
     h1 {
       font-size: 1.5rem;
       margin: 0 0 8px 0;
-      color: #38bdf8;
+      color: #CD032E;
       text-align: center;
     }
     p.subtitle {
-      color: #94a3b8;
+      color: #9AA3AD;
       font-size: 0.9rem;
       text-align: center;
       margin-bottom: 20px;
@@ -517,11 +802,11 @@ export function generateStandaloneRadarHtml(
     .hover-tip {
       margin-top: 16px;
       padding: 12px 16px;
-      background: #0f172a;
-      border-left: 4px solid #38bdf8;
+      background: #16181D;
+      border-left: 4px solid #CD032E;
       border-radius: 6px;
       font-size: 0.85rem;
-      color: #e2e8f0;
+      color: #E4E8EC;
       min-height: 48px;
     }
   </style>
@@ -553,10 +838,10 @@ export function generateStandaloneRadarHtml(
         datasets: [{
           label: 'Puntaje de Alineación (Escala 1 a 10)',
           data: dataPoints,
-          backgroundColor: 'rgba(56, 189, 248, 0.25)',
-          borderColor: '#38bdf8',
+          backgroundColor: 'rgba(58, 65, 74, 0.20)',
+          borderColor: '#3A414A',
           borderWidth: 2.5,
-          pointBackgroundColor: dataPoints.map(v => v === 0 ? '#94a3b8' : v >= 9 ? '#22c55e' : (v >= 6 ? '#eab308' : '#ef4444')),
+          pointBackgroundColor: dataPoints.map(v => v === 0 ? '#9AA3AD' : v >= 9 ? '#1E7D34' : (v >= 6 ? '#B26A00' : '#B00710')),
           pointBorderColor: '#ffffff',
           pointHoverRadius: 8,
           pointRadius: 6
@@ -571,19 +856,19 @@ export function generateStandaloneRadarHtml(
             max: 10,
             ticks: {
               stepSize: 2,
-              color: '#94a3b8',
+              color: '#9AA3AD',
               backdropColor: 'transparent'
             },
-            grid: { color: 'rgba(148, 163, 184, 0.15)' },
-            angleLines: { color: 'rgba(148, 163, 184, 0.2)' },
+            grid: { color: 'rgba(228, 232, 236, 0.15)' },
+            angleLines: { color: 'rgba(228, 232, 236, 0.2)' },
             pointLabels: {
-              color: '#f1f5f9',
+              color: '#F6F8FA',
               font: { size: 12, weight: '600' }
             }
           }
         },
         plugins: {
-          legend: { labels: { color: '#e2e8f0' } },
+          legend: { labels: { color: '#E4E8EC' } },
           tooltip: {
             callbacks: {
               afterLabel: function(context) {
@@ -615,8 +900,67 @@ export function generateMarkdownReport(
   evaluatorName: string,
   role: UserRole,
   results: PrincipleScoreResult[],
-  globalScore: number
+  globalScore: number,
+  extra?: {
+    perfilProyecto?: PerfilProyecto;
+    autovaloraciones?: Record<number, NivelMadurez | null>;
+    notasPorPrincipio?: Record<number, string>;
+  }
 ): string {
+  const perfilSection = (() => {
+    const p = extra?.perfilProyecto;
+    if (!p) return '';
+    const hasData = p.tipoSistema.length > 0 || p.autonomo || p.autoaprendizaje || p.decideSobrePersonas || p.abortoSeguro || p.supervision !== 'no_aplica';
+    if (!hasData) return '';
+    return `
+## Perfil del Sistema de IA
+- **Tipo de sistema:** ${p.tipoSistema.length > 0 ? p.tipoSistema.join(', ') : 'No especificado'}
+- **Autónomo:** ${p.autonomo ? 'Sí' : 'No'} | **Se reentrena en producción:** ${p.autoaprendizaje ? 'Sí' : 'No'} | **Decide sobre personas:** ${p.decideSobrePersonas ? 'Sí' : 'No'}
+- **Supervisión humana:** ${p.supervision}
+- **Mecanismo de detención segura ("stop"):** ${p.abortoSeguro ? 'Sí' : 'No'}
+
+---
+`;
+  })();
+
+  const autovaloracionSection = (() => {
+    const av = extra?.autovaloraciones;
+    if (!av) return '';
+    const entries = results
+      .map(r => ({ r, nivel: av[r.principle.id] }))
+      .filter(e => e.nivel != null);
+    if (entries.length === 0) return '';
+    const rows = entries
+      .map(({ r, nivel }) => `| ${r.principle.name} | ${NIVEL_MADUREZ_LABEL[nivel as NivelMadurez]} | ${r.riskLevel} |`)
+      .join('\n');
+    return `
+## Autovaloración vs. Resultado Calculado
+
+| Principio | Tu autovaloración | Resultado calculado |
+| :--- | :--- | :--- |
+${rows}
+
+---
+`;
+  })();
+
+  const notasSection = (() => {
+    const notas = extra?.notasPorPrincipio;
+    if (!notas) return '';
+    const entries = results
+      .map(r => ({ r, texto: notas[r.principle.id] }))
+      .filter(e => e.texto && e.texto.trim() !== '');
+    if (entries.length === 0) return '';
+    const items = entries.map(({ r, texto }) => `- **${r.principle.name}:** ${texto}`).join('\n');
+    return `
+## Notas de Seguimiento
+
+${items}
+
+---
+`;
+  })();
+
   const tableRows = results
     .map(
       r => `| **${r.principle.name}** | **${r.scaledScore != null ? r.scaledScore.toFixed(1) + ' / 10' : 'Sin evaluar'}** | **${r.riskLevel}** |`
@@ -628,6 +972,7 @@ export function generateMarkdownReport(
       r => `### ${r.principle.name}
 - **Puntaje Escala 1-10:** ${r.scaledScore != null ? r.scaledScore + ' / 10' : 'Sin evaluar'}
 - **Semáforo de Riesgo:** ${r.riskLevel}
+- **Marcos:** ${getMarcosForPrinciple(r.principle).join(', ')}
 - **Diagnóstico:** ${r.diagnostic}
 - **Recomendación Técnica:** ${r.technicalRecommendation || 'N/A — principio sin evaluar.'}
   * *Fuente Técnica:* ${r.principle.sources.technical}
@@ -664,7 +1009,7 @@ export function generateMarkdownReport(
 ${tableRows}
 
 ---
-
+${perfilSection}${autovaloracionSection}${notasSection}
 ## 3. b) CÓDIGO DEL GRÁFICO RADIAL (RADAR CHART - HTML/JS)
 
 \`\`\`html
